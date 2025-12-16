@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="en" dir="ltr">
 <head>
@@ -36,7 +37,7 @@
             color: var(--text-main);
             font-family: 'Rajdhani', sans-serif;
             min-height: 100vh;
-            overflow-x: hidden;
+            overflow-x: forbidden;
             padding-bottom: 80px;
         }
 
@@ -82,8 +83,6 @@
             font-size: 1.6rem; font-weight: 900; color: #fff;
             text-shadow: 2px 2px 0 #000, 4px 4px 5px rgba(0,0,0,0.5);
             letter-spacing: 1px;
-            background: linear-gradient(to bottom, #fff, #999);
-            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
         .lang-switch {
             background: transparent; border: 1px solid #555; color: #aaa;
@@ -102,9 +101,23 @@
             border-top: 1px solid #444; padding-top: 15px; margin-top: 10px; text-align: center;
         }
         .tg-btn {
-            background: #0088cc; color: white; border: none; padding: 8px 15px;
-            border-radius: 20px; font-size: 0.9rem; margin-top: 5px; cursor: pointer;
-            box-shadow: 0 4px 10px rgba(0,136,204,0.3); display: inline-flex; align-items: center; gap: 8px;
+            background: #333333; /* Changed from blue to gray */
+            color: white; 
+            border: 1px solid #444;
+            padding: 8px 15px;
+            border-radius: 20px; 
+            font-size: 0.9rem; 
+            margin-top: 5px; 
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3); 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 8px;
+            transition: 0.2s;
+        }
+        .tg-btn:hover {
+            background: #444444;
+            transform: scale(1.05);
         }
 
         /* 2. التعليمات (4 متدرجة) */
@@ -189,8 +202,14 @@
             color: #fff; position: relative; overflow: hidden;
             animation: slideUp 0.5s; box-shadow: 0 10px 20px rgba(0,0,0,0.5);
         }
-        .sig-green { background: linear-gradient(135deg, #1b5e20, #2e7d32); border: 1px solid #4caf50; }
-        .sig-red { background: linear-gradient(135deg, #b71c1c, #c62828); border: 1px solid #f44336; }
+        .sig-green { 
+            background: linear-gradient(135deg, #2a5c2a, #1e4a1e, #2e7d32); 
+            border: 1px solid #4caf50; 
+        }
+        .sig-red { 
+            background: linear-gradient(135deg, #7a1a1a, #5d1515, #8b0000); 
+            border: 1px solid #f44336; 
+        }
         
         @keyframes slideUp { from{opacity:0;transform:translateY(20px);} to{opacity:1;transform:translateY(0);} }
 
@@ -220,7 +239,7 @@
     <!-- 1️⃣ الشاشة الرئيسية -->
     <div id="home-view">
         <div class="header-top">
-            <div class="logo-text">SignalXPro 3D</div>
+            <div class="logo-text">SignalXPro</div>
             <button class="lang-switch" onclick="toggleLang()">AR / EN</button>
         </div>
 
@@ -515,29 +534,90 @@
             if(tab === 'results') document.getElementById('badge-res').style.opacity = '0';
         }
 
-        // ================= الإشارات والصوت =================
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        // ================= الصوت المحسّن بدون تقطع =================
         let muted = false;
-        let resCount = 0;
+        
+        function toggleMute() { 
+            muted = !muted; 
+            document.getElementById('icon-mute').className = muted ? 'fa-solid fa-volume-xmark' : 'fa-solid fa-volume-high'; 
+        }
 
-        function toggleMute() { muted = !muted; document.getElementById('icon-mute').className = muted ? 'fa-solid fa-volume-xmark' : 'fa-solid fa-volume-high'; }
+        // دالة لتوليد نغمة مستقلة لكل ضغطة (لتجنب التقطيع) - EXACTLY from the provided code
+        function playTone(freq, duration, type="sine", volume=0.4) {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc  = ctx.createOscillator();
+            const gain = ctx.createGain();
 
+            osc.type = type;
+            osc.frequency.value = freq;
+
+            gain.gain.setValueAtTime(volume, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration/1000);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start();
+            osc.stop(ctx.currentTime + duration/1000);
+        }
+
+        // صوت ربح: Ding → Ding أعلى - EXACTLY from the provided code
+        function win() {
+            if(muted) return;
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if(ctx.state === 'suspended') ctx.resume();
+            
+            playTone(600, 120);           // Ding الأول
+            setTimeout(() => playTone(900, 120), 110); // Ding الثاني أعلى قليلاً
+        }
+
+        // صوت خسارة محسّن أعلى: نغمة هابطة واضحة - EXACTLY from the provided code
+        function lose() {
+            if(muted) return;
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            if(ctx.state === 'suspended') ctx.resume();
+            
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(550, ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 0.3);
+
+            // LFO صغير لإضفاء اهتزاز خفيف
+            const lfo = ctx.createOscillator();
+            const lfoGain = ctx.createGain();
+            lfo.frequency.value = 8;  // اهتزاز
+            lfoGain.gain.value = 8;   // زيادة لتصبح واضحة
+            lfo.connect(lfoGain);
+            lfoGain.connect(osc.frequency);
+            lfo.start();
+            lfo.stop(ctx.currentTime + 0.3);
+
+            gain.gain.setValueAtTime(0.5, ctx.currentTime); // زيادة الصوت ليصبح مسموعاً جيداً
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.start();
+            osc.stop(ctx.currentTime + 0.3);
+        }
+
+        // ================= الإشارات والصوت =================
         function playSound(type) {
             if(muted) return;
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
             if(ctx.state === 'suspended') ctx.resume();
-            const o = ctx.createOscillator();
-            const g = ctx.createGain();
-            o.connect(g); g.connect(ctx.destination);
             
-            const now = ctx.currentTime;
             if(type === 'notify') {
-                o.frequency.setValueAtTime(600, now);
-                o.frequency.linearRampToValueAtTime(800, now+0.2);
-                g.gain.setValueAtTime(0.2, now);
-                g.gain.linearRampToValueAtTime(0, now+0.4);
-                o.start(now); o.stop(now+0.4);
+                // Play the exact win sound for signal notification
+                playTone(600, 120);
+                setTimeout(() => playTone(900, 120), 110);
             }
         }
+
+        let resCount = 0;
 
         function createSignal() {
             const isBuy = Math.random() > 0.5;
@@ -565,11 +645,18 @@
             playSound('notify');
 
             setTimeout(() => {
-                const win = true;
+                const winResult = Math.random() > 0.3; // 70% win rate
                 document.getElementById('sig-card').innerHTML = `
                     <div style="text-align:center; padding:30px; font-size:1.5rem; font-weight:bold;">
-                        ${win ? 'WIN 🏆' : 'LOSS ❌'}
+                        ${winResult ? '<i class="fa-solid fa-trophy"></i> WIN' : '<i class="fa-solid fa-xmark"></i> LOSS'}
                     </div>`;
+                
+                // Play the EXACT sounds from the provided code
+                if(winResult) {
+                    win();
+                } else {
+                    lose();
+                }
                 
                 resCount++;
                 const b = document.getElementById('badge-res');
@@ -578,9 +665,10 @@
 
                 const h = document.getElementById('history-content');
                 if(h.innerText.includes('No records')) h.innerHTML = '';
-                h.innerHTML += `<div style="border-bottom:1px solid #333; padding:10px;">EUR/USD - WIN</div>`;
+                h.innerHTML += `<div style="border-bottom:1px solid #333; padding:10px;">EUR/USD - ${winResult ? 'WIN' : 'LOSS'}</div>`;
             }, 5000);
         }
     </script>
 </body>
 </html>
+```
